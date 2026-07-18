@@ -163,6 +163,8 @@ const Channel = () => {
     position: "relative",
   };
 
+  
+
   return (
     <div className="container-fluid p-0 pb-4">
       {/* Banner / Cover */}
