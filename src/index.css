@@ -1,0 +1,459 @@
+:root {
+  /* LIGHT Mode Variables (DEFAULT) */
+  --font-sans: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  --bg-primary: #f6f5fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eeeef5;
+  --text-main: #181622;
+  --text-muted: #6b687d;
+  --accent-purple: #7b2cbf;
+  --accent-purple-light: #9d4edd;
+  --accent-cyan: #ff477e;
+  --accent-cyan-dark: #ff0a54;
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border-hover: rgba(123, 44, 191, 0.25);
+  --shadow-main: rgba(0, 0, 0, 0.04) 0px 8px 24px;
+  --border-radius-lg: 16px;
+  --border-radius-md: 10px;
+}
+
+.dark-theme {
+  /* DARK Mode Variables (TOGGLED) */
+  --bg-primary: #0a090e;
+  --bg-secondary: #121019;
+  --bg-tertiary: #191724;
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --accent-purple: #7b2cbf;
+  --accent-purple-light: #9d4edd;
+  --accent-cyan: #ff70a6;
+  --accent-cyan-dark: #ff477e;
+  --glass-bg: rgba(18, 16, 25, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-border-hover: rgba(123, 44, 191, 0.4);
+  --shadow-main: rgba(0, 0, 0, 0.5) 0px 8px 24px;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Base element color overrides for theme responsiveness */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6 {
+  color: var(--text-main) !important;
+  transition: color 0.3s ease;
+}
+
+p,
+span,
+label,
+input,
+textarea,
+select,
+li,
+td,
+th {
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+body,
+p,
+label,
+li,
+td,
+th {
+  color: var(--text-main);
+}
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+select option {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-main) !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--accent-purple), var(--accent-cyan));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-purple-light);
+}
+
+/* Glassmorphism Panel */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-main);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  border-color: var(--accent-purple-light) !important;
+  box-shadow: 0 12px 32px 0 rgba(123, 44, 191, 0.15);
+  transform: translateY(-4px);
+}
+
+/* Override bootstrap border secondary */
+.border-secondary {
+  border-color: var(--glass-border) !important;
+}
+
+/* Active Link Gradients */
+.nav-link-custom {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--border-radius-md);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nav-link-custom:hover,
+.nav-link-custom.active {
+  color: var(--text-main);
+  background: linear-gradient(135deg, rgba(123, 44, 191, 0.12), rgba(0, 245, 212, 0.04));
+  border-left: 3px solid var(--accent-purple);
+}
+
+/* Accent Gradients for Buttons */
+.btn-gradient {
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan-dark)) !important;
+  color: #fff !important;
+  border: none !important;
+  font-weight: 600;
+  border-radius: var(--border-radius-md);
+  padding: 10px 24px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-gradient:hover {
+  transform: scale(1.03);
+  opacity: 0.95;
+  color: #fff !important;
+  box-shadow: 0 4px 15px rgba(123, 44, 191, 0.3);
+}
+
+.btn-gradient:active {
+  transform: scale(0.97);
+}
+
+.btn-glass {
+  background: rgba(123, 44, 191, 0.05) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--text-main) !important;
+  border-radius: var(--border-radius-md);
+  padding: 10px 20px;
+  transition: all 0.3s ease;
+}
+
+.btn-glass:hover {
+  background: rgba(123, 44, 191, 0.1) !important;
+  border-color: var(--accent-purple-light) !important;
+  color: var(--text-main) !important;
+}
+
+/* Form Styling */
+.form-control-glass {
+  background: rgba(123, 44, 191, 0.03) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--text-main) !important;
+  border-radius: var(--border-radius-md) !important;
+  padding: 12px 16px !important;
+  transition: all 0.3s ease !important;
+}
+
+.form-control-glass:focus {
+  border-color: var(--accent-purple) !important;
+  box-shadow: 0 0 0 3px rgba(123, 44, 191, 0.18) !important;
+  background: var(--bg-secondary) !important;
+}
+
+.form-control-glass::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.65;
+}
+
+/* Table styling for light & dark themes */
+.table {
+  --bs-table-bg: transparent !important;
+  --bs-table-color: var(--text-main) !important;
+  --bs-table-hover-color: var(--text-main) !important;
+  --bs-table-hover-bg: rgba(0, 0, 0, 0.03) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-theme .table {
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.04) !important;
+}
+
+.table th,
+.table td {
+  color: var(--text-main) !important;
+  border-color: var(--glass-border) !important;
+}
+
+/* Responsive side indicators */
+.text-main {
+  color: var(--text-main) !important;
+}
+
+.text-muted-custom {
+  color: var(--text-muted) !important;
+}
+
+/* Badges */
+.badge-neon {
+  background: rgba(123, 44, 191, 0.08);
+  color: var(--accent-purple-light);
+  border: 1px solid rgba(123, 44, 191, 0.2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Sidebar and Navbar Theme Overrides */
+.navbar {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--glass-border) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.sidebar-container {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--glass-border) !important;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 240px;
+}
+
+.sidebar-container.collapsed {
+  width: 80px;
+}
+
+/* Dropdown Menu overrides */
+.dropdown-menu {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-main) !important;
+}
+
+.dropdown-item {
+  color: var(--text-main) !important;
+}
+
+.dropdown-item:hover {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--text-main) !important;
+}
+
+/* Custom Grid layout for Sidebar & Content */
+.app-container {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+@media (max-width: 992px) {
+  .app-container {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-container {
+    display: none;
+  }
+}
+
+/* Hover Zoom Cards */
+.hover-zoom-img {
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.hover-zoom-img img {
+  transition: transform 0.5s ease;
+}
+
+.hover-zoom-img:hover img {
+  transform: scale(1.05);
+}
+
+/* Interactive Tabs */
+.tab-custom {
+  cursor: pointer;
+  padding: 12px 24px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.tab-custom.active {
+  color: var(--accent-purple);
+  border-bottom-color: var(--accent-purple);
+}
+
+/* Toast/Alert notification container */
+.alert-glass {
+  background: rgba(123, 44, 191, 0.08) !important;
+  border: 1px solid rgba(123, 44, 191, 0.2) !important;
+  backdrop-filter: blur(8px);
+  color: var(--text-main) !important;
+  border-radius: var(--border-radius-md);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan-dark) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark-theme .text-gradient {
+  background: linear-gradient(135deg, #ffffff 30%, var(--accent-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Scrollable Category Filter Pills */
+.filter-scroll-wrapper {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Hide standard firefox scrollbar */
+}
+
+.filter-scroll-wrapper::-webkit-scrollbar {
+  display: none;
+  /* Hide chrome scrollbar */
+}
+
+/* Premium Sidebar text toggle */
+.sidebar-text {
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-container.collapsed .sidebar-text {
+  opacity: 0;
+  display: none;
+}
+
+.sidebar-container.collapsed .nav-link-custom {
+  justify-content: center;
+  padding: 14px;
+}
+
+.sidebar-container.collapsed .text-uppercase {
+  display: none;
+}
+
+.sidebar-container.collapsed .glass-panel {
+  display: none;
+}
+
+@keyframes tweetGlow {
+  0% {
+    border-color: var(--accent-purple) !important;
+    box-shadow: 0 0 20px rgba(123, 44, 191, 0.45);
+    transform: scale(1.015);
+  }
+
+  100% {
+    border-color: var(--glass-border) !important;
+    box-shadow: var(--shadow-main);
+    transform: scale(1);
+  }
+}
+
+.highlighted-tweet {
+  animation: tweetGlow 3.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  border-color: var(--accent-purple) !important;
+}
+
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* Collapsed Mobile Navbar Styles (max-width: 991.98px) */
+@media (max-width: 991.98px) {
+  /* Use margins on children to prevent Bootstrap collapsing/snapping height jitter */
+  .navbar-collapse .mx-lg-5 {
+    margin: 16px 0 !important;
+  }
+  
+  .navbar-collapse .d-flex.align-items-center.gap-3.justify-content-start {
+    justify-content: space-around !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+    padding-top: 16px !important;
+    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  }
+}
+
+.border-cyan {
+  border-color: var(--accent-cyan) !important;
+}
+
+/* Playlist details page responsive custom styles */
+.playlist-video-thumb {
+  width: 100px;
+}
+
+@media (min-width: 768px) {
+  .playlist-video-thumb {
+    width: 160px;
+  }
+}
+
+@media (min-width: 992px) {
+  .sticky-playlist-sidebar {
+    position: sticky !important;
+    top: 100px;
+    z-index: 5;
+  }
+}
