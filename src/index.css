@@ -481,3 +481,44 @@ select.form-control-glass.form-select {
   background-color: rgba(123, 44, 191, 0.08) !important;
   color: var(--text-main) !important;
 }
+
+/* Sleek, Light & Subtle Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(123, 44, 191, 0.2) !important;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 44, 191, 0.45) !important;
+}
+
+/* Dark theme subtle light scrollbar */
+.dark-theme ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 44, 191, 0.4) !important;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(123, 44, 191, 0.2) transparent;
+}
+
+.dark-theme * {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
