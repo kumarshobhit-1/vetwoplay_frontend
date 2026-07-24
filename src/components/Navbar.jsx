@@ -348,10 +348,12 @@ const Navbar = () => {
 
             {user ? (
               <>
-                <Link to="/upload" className="btn btn-gradient d-flex align-items-center gap-2 py-2">
-                  <i className="bi bi-upload"></i>
-                  <span className="d-none d-md-inline">Upload</span>
-                </Link>
+                {user.hasChannel && (
+                  <Link to="/upload" className="btn btn-gradient d-flex align-items-center gap-2 py-2">
+                    <i className="bi bi-upload"></i>
+                    <span className="d-none d-md-inline">Upload</span>
+                  </Link>
+                )}
 
                 <Link to="/tweets" className="btn btn-glass d-flex align-items-center gap-2 py-2 shadow-sm">
                   <i className="bi bi-chat-left-text text-main"></i>
@@ -386,31 +388,41 @@ const Navbar = () => {
                         <p className="small text-muted mb-0">{user.email}</p>
                       </div>
                     </li>
-                    <li>
-                      <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to={`/c/${user.username}`}>
-                        <i className="bi bi-person-circle"></i> My Channel
-                      </Link>
-                    </li>
-                    <li>
-                      <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/dashboard">
-                        <i className="bi bi-speedometer2"></i> Creator Dashboard
-                      </Link>
-                    </li>
-                    <li>
-                      <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/playlists">
-                        <i className="bi bi-collection-play"></i> My Playlists
-                      </Link>
-                    </li>
-                    <li>
-                      <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/liked-videos">
-                        <i className="bi bi-heart"></i> Liked Videos
-                      </Link>
-                    </li>
-                    <li>
-                      <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/watch-history">
-                        <i className="bi bi-clock-history"></i> Watch History
-                      </Link>
-                    </li>
+                    {user.hasChannel ? (
+                      <>
+                        <li>
+                          <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to={`/c/${user.username}`}>
+                            <i className="bi bi-person-circle"></i> My Channel
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/dashboard">
+                            <i className="bi bi-speedometer2"></i> Creator Dashboard
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/playlists">
+                            <i className="bi bi-collection-play"></i> My Playlists
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/liked-videos">
+                            <i className="bi bi-heart"></i> Liked Videos
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/watch-history">
+                            <i className="bi bi-clock-history"></i> Watch History
+                          </Link>
+                        </li>
+                      </>
+                    ) : (
+                      <li>
+                        <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to={`/c/${user.username}`}>
+                          <i className="bi bi-person-circle text-pink"></i> My Profile
+                        </Link>
+                      </li>
+                    )}
                     <li>
                       <Link className="dropdown-item rounded py-2 d-flex align-items-center gap-2" to="/settings">
                         <i className="bi bi-gear"></i> Settings

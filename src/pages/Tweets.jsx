@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import apiClient from "../api/client";
+import toast from "react-hot-toast";
+import Swal from "sweetalert2";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const Tweets = () => {
@@ -32,6 +34,7 @@ const Tweets = () => {
 
   // Share clipboard success tracking
   const [copiedTweetId, setCopiedTweetId] = useState(null);
+  const [tweetAlert, setTweetAlert] = useState("");
 
   // Bookmark & Repost tracking simulation
   const [bookmarkedTweets, setBookmarkedTweets] = useState(new Set());
@@ -62,6 +65,35 @@ const Tweets = () => {
     fetchTweets(page);
   }, [page]);
 
+  useEffect(() => {
+    if (!loading && tweets.length > 0 && window.location.hash) {
+      const tweetId = window.location.hash.replace("#tweet-", "");
+      if (tweetId) {
+        const hasTweet = tweets.some((t) => t._id === tweetId);
+        if (hasTweet) {
+          const timer = setTimeout(() => {
+            const element = document.getElementById(`tweet-${tweetId}`);
+            if (element) {
+              element.scrollIntoView({ behavior: "smooth", block: "center" });
+              element.style.transition = "all 0.6s ease";
+              element.style.borderColor = "var(--accent-pink)";
+              element.style.boxShadow = "0 0 20px rgba(236, 72, 153, 0.5)";
+              setTimeout(() => {
+                element.style.borderColor = "var(--border-secondary)";
+                element.style.boxShadow = "none";
+              }, 3000);
+            }
+          }, 300);
+          return () => clearTimeout(timer);
+        } else {
+          setTweetAlert("This tweet is no longer available. It may have been deleted by the creator.");
+          // Clear hash to prevent infinite check triggers
+          window.history.replaceState(null, null, " ");
+        }
+      }
+    }
+  }, [loading, tweets]);
+
   const handlePostTweetSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -70,7 +102,7 @@ const Tweets = () => {
     }
     if (!newTweetText.trim()) return;
     if (newTweetText.trim().length > 280) {
-      alert("Tweet text must be less than 280 characters.");
+      toast.error("Tweet text must be less than 280 characters.");
       return;
     }
 
@@ -98,6 +130,7 @@ const Tweets = () => {
         setAttachedImage(null);
         setImageFile(null);
         setShowEmojiPicker(false);
+        toast.success("Tweet posted successfully");
         // Prepend new tweet
         const newTweet = {
           ...response.data.data,
@@ -112,30 +145,46 @@ const Tweets = () => {
         setPage(1); // Go to first page to see the new tweet
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Error posting tweet");
+      toast.error(err.response?.data?.message || "Error posting tweet");
     } finally {
       setSubmitLoading(false);
     }
   };
 
-  const handleTweetDelete = async (tweetId) => {
+  const handleTweetDelete = (tweetId) => {
     if (!user) return;
-    if (!window.confirm("Are you sure you want to delete this tweet?")) return;
-
-    try {
-      const response = await apiClient.delete(`/tweet/delete-tweet/${tweetId}`);
-      if (response.data?.success) {
-        setTweets((prev) => prev.filter((t) => t._id !== tweetId));
-        // Refetch to fill page if empty
-        if (tweets.length <= 1 && page > 1) {
-          setPage((p) => p - 1);
-        } else {
-          fetchTweets(page);
+    Swal.fire({
+      title: "Delete Tweet?",
+      text: "Are you sure you want to permanently delete this tweet?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--accent-cyan)",
+      cancelButtonColor: "var(--text-muted)",
+      confirmButtonText: "Yes, delete it!",
+      background: "var(--bg-secondary)",
+      color: "var(--text-main)",
+      customClass: {
+        popup: "glass-panel shadow-lg border-secondary"
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const response = await apiClient.delete(`/tweet/delete-tweet/${tweetId}`);
+          if (response.data?.success) {
+            setTweets((prev) => prev.filter((t) => t._id !== tweetId));
+            toast.success("Tweet deleted successfully");
+            // Refetch to fill page if empty
+            if (tweets.length <= 1 && page > 1) {
+              setPage((p) => p - 1);
+            } else {
+              fetchTweets(page);
+            }
+          }
+        } catch (err) {
+          toast.error(err.response?.data?.message || "Error deleting tweet");
         }
       }
-    } catch (err) {
-      alert(err.response?.data?.message || "Error deleting tweet");
-    }
+    });
   };
 
   const handleTweetLikeToggle = async (tweetId, index) => {
@@ -155,7 +204,7 @@ const Tweets = () => {
     setTweets(updatedTweets);
 
     try {
-      await apiClient.post(`/likes/tweetlike/${tweetId}`);
+      await apiClient.patch(`/likes/tweetlike/${tweetId}`);
     } catch (err) {
       console.error("Tweet like toggle failed:", err);
       const revertedTweets = [...tweets];
@@ -164,20 +213,40 @@ const Tweets = () => {
     }
   };
 
-  const handleBookmarkToggle = (tweetId) => {
+  const handleBookmarkToggle = async (tweetId, index) => {
     if (!user) {
       navigate("/login", { state: { message: "Please log in to bookmark tweets!" } });
       return;
     }
-    setBookmarkedTweets((prev) => {
-      const next = new Set(prev);
-      if (next.has(tweetId)) {
-        next.delete(tweetId);
-      } else {
-        next.add(tweetId);
+
+    const tweet = tweets[index];
+    const previousStatus = tweet.isBookmarked;
+
+    // Optimistic UI update
+    const updatedTweets = [...tweets];
+    updatedTweets[index] = {
+      ...tweet,
+      isBookmarked: !previousStatus
+    };
+    setTweets(updatedTweets);
+
+    try {
+      const response = await apiClient.post(`/bookmarks/toggle/${tweetId}`);
+      if (response.data?.success) {
+        const syncedTweets = [...tweets];
+        syncedTweets[index] = {
+          ...tweet,
+          isBookmarked: response.data.data.bookmarked
+        };
+        setTweets(syncedTweets);
       }
-      return next;
-    });
+    } catch (err) {
+      console.error("Bookmark toggle failed:", err);
+      // Revert on failure
+      const revertedTweets = [...tweets];
+      revertedTweets[index] = tweet;
+      setTweets(revertedTweets);
+    }
   };
 
   const handleRepostToggle = (tweetId) => {
@@ -210,7 +279,7 @@ const Tweets = () => {
     e.preventDefault();
     if (!editingText.trim()) return;
     if (editingText.trim().length > 280) {
-      alert("Tweet text must be less than 280 characters.");
+      toast.error("Tweet text must be less than 280 characters.");
       return;
     }
 
@@ -230,10 +299,11 @@ const Tweets = () => {
               : t
           )
         );
+        toast.success("Tweet updated successfully");
         cancelEditing();
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Error updating tweet");
+      toast.error(err.response?.data?.message || "Error updating tweet");
     }
   };
 
@@ -306,6 +376,26 @@ const Tweets = () => {
             </div>
             <i className="bi bi-patch-check-fill fs-3 text-gradient"></i>
           </div>
+
+          {tweetAlert && (
+            <div 
+              className="glass-panel border-secondary py-3 px-4 rounded-3 shadow d-flex align-items-center justify-content-between mb-4 text-start animate-fade-in"
+              style={{ background: "var(--bg-secondary)", borderLeft: "4px solid var(--accent-cyan) !important" }}
+            >
+              <div className="d-flex align-items-center gap-3">
+                <i className="bi bi-exclamation-triangle-fill text-pink fs-5"></i>
+                <div>
+                  <h6 className="fw-bold text-main mb-0.5" style={{ fontSize: "0.9rem" }}>Tweet Unavailable</h6>
+                  <p className="text-muted small mb-0">{tweetAlert}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setTweetAlert("")} 
+                className="btn-close ms-3 small"
+                aria-label="Close"
+              ></button>
+            </div>
+          )}
 
           {/* Composer Box (Logged In) / Invitation (Logged Out) */}
           {!user ? (
@@ -571,12 +661,19 @@ const Tweets = () => {
 
                         {/* Tweet Image if present */}
                         {tweet.image && (
-                          <div className="mb-3 rounded border border-secondary overflow-hidden bg-dark bg-opacity-25" style={{ maxWidth: "100%", maxHeight: "400px" }}>
+                          <div 
+                            className="mb-3 rounded border border-secondary overflow-hidden bg-dark bg-opacity-25 shadow-sm d-inline-block" 
+                            style={{ maxWidth: "100%" }}
+                          >
                             <img 
                               src={tweet.image} 
                               alt="Tweet Media" 
-                              className="img-fluid w-100" 
-                              style={{ maxHeight: "400px", objectFit: "contain" }} 
+                              style={{ 
+                                display: "block",
+                                maxWidth: "100%", 
+                                maxHeight: "420px", 
+                                objectFit: "contain" 
+                              }} 
                             />
                           </div>
                         )}
@@ -621,16 +718,16 @@ const Tweets = () => {
                             </button>
                           )}
 
-                          {/* Bookmark Simulator (Disabled/Hidden for Own Tweets) */}
+                          {/* Bookmark Action */}
                           {!isOwnTweet ? (
                             <button
-                              onClick={() => handleBookmarkToggle(tweet._id)}
+                              onClick={() => handleBookmarkToggle(tweet._id, index)}
                               className={`btn btn-link p-1 border-0 text-decoration-none d-flex align-items-center transition-all ${
-                                bookmarkedTweets.has(tweet._id) ? "text-warning" : "text-muted"
+                                tweet.isBookmarked ? "text-warning" : "text-muted"
                               }`}
-                              title={bookmarkedTweets.has(tweet._id) ? "Bookmarked" : "Bookmark"}
+                              title={tweet.isBookmarked ? "Bookmarked" : "Bookmark"}
                             >
-                              <i className={`bi fs-5 ${bookmarkedTweets.has(tweet._id) ? "bi-bookmark-fill" : "bi-bookmark"}`}></i>
+                              <i className={`bi fs-5 ${tweet.isBookmarked ? "bi-bookmark-fill" : "bi-bookmark"}`}></i>
                             </button>
                           ) : (
                             <button

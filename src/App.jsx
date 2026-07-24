@@ -2,10 +2,10 @@ import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { Toaster } from "react-hot-toast";
 
 // Components
 import Navbar from "./components/Navbar";
-import Sidebar from "./components/Sidebar";
 import Footer from "./components/Footer";
 
 // Pages
@@ -23,30 +23,43 @@ import UploadVideo from "./pages/UploadVideo";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Settings from "./pages/Settings";
+import NotFound from "./pages/NotFound";
 
-// Layout Wrapper to manage sidebar collapse toggling
 const MainLayout = () => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const hideSidebarPaths = ["/login", "/register"];
-  const shouldHideSidebar = hideSidebarPaths.includes(location.pathname);
   const isHomePath = location.pathname === "/";
+  const hideBackButton = isHomePath || location.pathname === "/login" || location.pathname === "/register";
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => !prev);
+  const isValidRoute = () => {
+    const path = location.pathname;
+    const staticRoutes = [
+      "/",
+      "/login",
+      "/register",
+      "/tweets",
+      "/playlists",
+      "/watch-history",
+      "/liked-videos",
+      "/dashboard",
+      "/upload",
+      "/about",
+      "/contact",
+      "/settings"
+    ];
+    if (staticRoutes.includes(path)) return true;
+    if (path.startsWith("/watch/")) return true;
+    if (path.startsWith("/c/")) return true;
+    return false;
   };
 
   return (
     <div className="d-flex flex-column" style={{ minHeight: "100vh" }}>
-      <Navbar toggleSidebar={toggleSidebar} />
+      <Navbar />
       <div className="d-flex flex-grow-1">
-        {!shouldHideSidebar && (
-          <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-        )}
         <main className="flex-grow-1 d-flex flex-column" style={{ minWidth: 0 }}>
           <div className="flex-grow-1">
-            {!isHomePath && (
+            {!hideBackButton && isValidRoute() && (
               <div className="container pt-4 pb-0 d-flex align-items-center mb-3">
                 <button
                   onClick={() => navigate(-1)}
@@ -73,6 +86,7 @@ const MainLayout = () => {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </div>
           <Footer />
@@ -88,6 +102,19 @@ function App() {
       <AuthProvider>
         <Router>
           <MainLayout />
+          <Toaster 
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "var(--bg-secondary)",
+                color: "var(--text-main)",
+                border: "1px solid var(--glass-border)",
+                borderRadius: "12px",
+                fontSize: "0.9rem",
+                boxShadow: "var(--shadow-main)"
+              }
+            }}
+          />
         </Router>
       </AuthProvider>
     </ThemeProvider>

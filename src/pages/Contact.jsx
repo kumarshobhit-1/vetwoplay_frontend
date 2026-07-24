@@ -108,7 +108,7 @@ const Contact = () => {
                   <input
                     type="text"
                     className="form-control form-control-glass"
-                    placeholder="e.g. Shobhit"
+                    placeholder="e.g. Vetwo User"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required

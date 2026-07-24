@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/client";
+import toast from "react-hot-toast";
+import Swal from "sweetalert2";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const Watch = () => {
@@ -25,6 +28,76 @@ const Watch = () => {
   const [likesCount, setLikesCount] = useState(0);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
+
+  // Playlist Saving state
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [userPlaylists, setUserPlaylists] = useState([]);
+  const [playlistsLoading, setPlaylistsLoading] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [newPlaylistDesc, setNewPlaylistDesc] = useState("");
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false);
+
+  const fetchUserPlaylists = async () => {
+    if (!user) return;
+    setPlaylistsLoading(true);
+    try {
+      const response = await apiClient.get(`/playlists/showplaylist/${user._id}`);
+      if (response.data?.success) {
+        setUserPlaylists(response.data.data.playlists || []);
+      }
+    } catch (err) {
+      console.error("Error fetching user playlists for save:", err);
+    } finally {
+      setPlaylistsLoading(false);
+    }
+  };
+
+  const handleSaveToPlaylistClick = () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    setShowPlaylistModal(true);
+    fetchUserPlaylists();
+  };
+
+  const handleCheckboxChange = async (playlist, isChecked) => {
+    try {
+      if (isChecked) {
+        await apiClient.patch(`/playlists/${playlist._id}/addvideo/${videoId}`);
+        toast.success(`Video added to ${playlist.name}`);
+      } else {
+        await apiClient.delete(`/playlists/${playlist._id}/removevideo/${videoId}`);
+        toast.success(`Video removed from ${playlist.name}`);
+      }
+      fetchUserPlaylists();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update playlist");
+    }
+  };
+
+  const handleCreatePlaylistInModal = async (e) => {
+    e.preventDefault();
+    if (!newPlaylistName.trim()) return;
+
+    setCreatingPlaylist(true);
+    try {
+      const response = await apiClient.post("/playlists/createplaylist", {
+        name: newPlaylistName.trim(),
+        description: newPlaylistDesc.trim(),
+      });
+      if (response.data?.success) {
+        setNewPlaylistName("");
+        setNewPlaylistDesc("");
+        toast.success("Playlist created successfully");
+        fetchUserPlaylists();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Error creating playlist");
+    } finally {
+      setCreatingPlaylist(false);
+    }
+  };
 
   const fetchVideoDetails = async () => {
     setLoading(true);
@@ -140,16 +213,33 @@ const Watch = () => {
     }
   };
 
-  const handleCommentDelete = async (commentId) => {
-    if (!window.confirm("Are you sure you want to delete this comment?")) return;
-    try {
-      const response = await apiClient.delete(`/comment/deletecomment/${commentId}`);
-      if (response.data?.success) {
-        setComments((prev) => prev.filter((c) => c._id !== commentId));
+  const handleCommentDelete = (commentId) => {
+    Swal.fire({
+      title: "Delete Comment?",
+      text: "Are you sure you want to delete this comment?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--accent-cyan)",
+      cancelButtonColor: "var(--text-muted)",
+      confirmButtonText: "Yes, delete it!",
+      background: "var(--bg-secondary)",
+      color: "var(--text-main)",
+      customClass: {
+        popup: "glass-panel shadow-lg border-secondary"
       }
-    } catch (err) {
-      console.error("Error deleting comment:", err);
-    }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const response = await apiClient.delete(`/comment/deletecomment/${commentId}`);
+          if (response.data?.success) {
+            setComments((prev) => prev.filter((c) => c._id !== commentId));
+            toast.success("Comment deleted successfully");
+          }
+        } catch (err) {
+          toast.error(err.response?.data?.message || "Failed to delete comment.");
+        }
+      }
+    });
   };
 
   const handleCommentLikeToggle = async (commentId, index) => {
@@ -184,13 +274,17 @@ const Watch = () => {
 
   if (error || !video) {
     return (
-      <div className="container py-5 text-center">
-        <div className="glass-panel border-danger p-5 mx-auto" style={{ maxWidth: "500px" }}>
-          <i className="bi bi-exclamation-octagon text-danger fs-1 mb-3"></i>
-          <h4 className="fw-bold">Video Unavailable</h4>
-          <p className="text-muted small mb-4">{error || "This video could not be loaded."}</p>
-          <Link to="/" className="btn btn-gradient px-4 py-2">
-            Back to Home Feed
+      <div className="container py-5 d-flex align-items-center justify-content-center" style={{ minHeight: "70vh" }}>
+        <div 
+          className="glass-panel border-secondary p-5 mx-auto text-center shadow-lg position-relative" 
+          style={{ maxWidth: "480px", borderRadius: "20px", background: "var(--bg-secondary)" }}
+        >
+          <i className="bi bi-camera-video-off text-pink fs-1 mb-3 d-block"></i>
+          <h4 className="fw-bold text-main mb-2">Video Unavailable</h4>
+          <p className="text-muted small mb-4">This video is no longer available. It may have been deleted or removed by the creator.</p>
+          <Link to="/" className="btn btn-gradient px-4 py-2.5 rounded-pill text-white fw-bold shadow-sm d-inline-flex align-items-center gap-2">
+            <i className="bi bi-house"></i>
+            <span>Back to Home Feed</span>
           </Link>
         </div>
       </div>
@@ -237,6 +331,15 @@ const Watch = () => {
               >
                 <i className={`bi ${isLiked ? "bi-heart-fill text-danger" : "bi-heart"}`}></i>
                 <span>{likesCount}</span>
+              </button>
+
+              <button
+                onClick={handleSaveToPlaylistClick}
+                className="btn btn-glass border-secondary text-muted d-flex align-items-center gap-2 px-4 py-2 rounded-pill fw-semibold transition-all"
+                title="Save to Playlist"
+              >
+                <i className="bi bi-plus-square"></i>
+                <span>Save</span>
               </button>
 
               {user && user._id === video?.owner?._id && (
@@ -344,20 +447,35 @@ const Watch = () => {
               <div className="d-flex flex-column gap-3 overflow-y-auto pr-1 flex-grow-1" style={{ maxHeight: "600px" }}>
                 {comments.map((comment, index) => (
                   <div key={comment._id} className="d-flex gap-2 pb-3 border-bottom border-secondary text-start align-items-start">
-                    <Link to={`/c/${comment.owner?.username}`}>
+                    {comment.owner?.hasChannel ? (
+                      <Link to={`/c/${comment.owner?.username}`}>
+                        <img
+                          src={comment.owner?.avatar}
+                          alt={comment.owner?.username}
+                          className="rounded-circle border"
+                          style={{ width: "32px", height: "32px", objectFit: "cover" }}
+                        />
+                      </Link>
+                    ) : (
                       <img
                         src={comment.owner?.avatar}
                         alt={comment.owner?.username}
                         className="rounded-circle border"
-                        style={{ width: "32px", height: "32px", objectFit: "cover" }}
+                        style={{ width: "32px", height: "32px", objectFit: "cover", filter: "grayscale(100%)" }}
                       />
-                    </Link>
+                    )}
 
                     <div className="flex-grow-1 overflow-hidden">
                       <div className="d-flex align-items-center justify-content-between mb-1">
-                        <Link to={`/c/${comment.owner?.username}`} className="text-main small text-decoration-none fw-bold">
-                          @{comment.owner?.username}
-                        </Link>
+                        {comment.owner?.hasChannel ? (
+                          <Link to={`/c/${comment.owner?.username}`} className="text-main small text-decoration-none fw-bold">
+                            @{comment.owner?.username}
+                          </Link>
+                        ) : (
+                          <span className="text-muted small fw-bold">
+                            @{comment.owner?.username}
+                          </span>
+                        )}
                         <span className="small text-muted" style={{ fontSize: "0.75rem" }}>
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </span>
@@ -419,6 +537,117 @@ const Watch = () => {
           </div>
         </div>
       </div>
+
+      {/* Save to Playlist Modal Overlay */}
+      {showPlaylistModal && createPortal(
+          <div
+            className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.75)",
+              zIndex: 2000,
+              backdropFilter: "blur(4px)"
+            }}
+          >
+            <div
+              className="glass-panel border-secondary p-4 w-100 text-main text-start shadow-lg"
+              style={{ maxWidth: "400px", borderRadius: "20px", background: "var(--bg-secondary)" }}
+            >
+              <div className="d-flex align-items-center justify-content-between mb-3 border-bottom border-secondary pb-2">
+                <h5 className="fw-bold mb-0 text-gradient">Save to...</h5>
+                <button
+                  type="button"
+                  onClick={() => setShowPlaylistModal(false)}
+                  className="btn-close"
+                  aria-label="Close"
+                ></button>
+              </div>
+
+              {playlistsLoading ? (
+                <div className="py-4 text-center">
+                  <div className="spinner-border spinner-border-sm text-pink" role="status"></div>
+                  <span className="ms-2 small text-muted">Loading playlists...</span>
+                </div>
+              ) : userPlaylists.length === 0 ? (
+                <div className="text-center py-4 text-muted small">
+                  <i className="bi bi-folder-plus fs-2 mb-2 d-block text-secondary"></i>
+                  <span>No playlists created yet.</span>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-1 my-3 overflow-y-auto pr-1" style={{ maxHeight: "180px" }}>
+                  {userPlaylists.map((pl) => {
+                    const hasVideo = pl.videos?.some((v) => v._id === videoId);
+                    return (
+                      <label 
+                        key={pl._id} 
+                        className="d-flex align-items-center justify-content-between py-2 px-3 mb-2 cursor-pointer btn-dropdown-hover" 
+                        style={{ 
+                          cursor: "pointer",
+                          background: "var(--bg-primary)",
+                          border: "1px solid var(--glass-border-hover)",
+                          borderRadius: "10px"
+                        }}
+                      >
+                        <span className="fw-semibold text-main small">{pl.name}</span>
+                        <input
+                          className="form-check-input border-secondary accent-pink"
+                          type="checkbox"
+                          checked={hasVideo}
+                          onChange={(e) => handleCheckboxChange(pl, e.target.checked)}
+                          style={{ cursor: "pointer", width: "18px", height: "18px" }}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Quick Playlist Creation form */}
+              <form onSubmit={handleCreatePlaylistInModal} className="border-top border-secondary pt-3 mt-3">
+                <span className="text-muted small fw-semibold d-block mb-3">Create new playlist:</span>
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Playlist name"
+                    value={newPlaylistName}
+                    onChange={(e) => setNewPlaylistName(e.target.value)}
+                    className="form-control form-control-glass py-2 px-3"
+                    style={{ fontSize: "0.85rem", borderRadius: "10px" }}
+                  />
+                </div>
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    placeholder="Description (optional)"
+                    value={newPlaylistDesc}
+                    onChange={(e) => setNewPlaylistDesc(e.target.value)}
+                    className="form-control form-control-glass py-2 px-3"
+                    style={{ fontSize: "0.85rem", borderRadius: "10px" }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={creatingPlaylist}
+                  className="btn btn-gradient w-100 py-2.5 fw-bold rounded-pill text-white small shadow-sm d-flex align-items-center justify-content-center gap-2"
+                  style={{ fontSize: "0.85rem" }}
+                >
+                  {creatingPlaylist ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status"></span>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-plus-circle"></i>
+                      <span>Create Playlist</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

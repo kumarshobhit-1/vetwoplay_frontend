@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/client";
+import toast from "react-hot-toast";
+import Swal from "sweetalert2";
 
 const Settings = () => {
   const { user, updateUser } = useAuth();
@@ -35,6 +37,49 @@ const Settings = () => {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+
+  // State: Delete Channel
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleDeleteChannel = () => {
+    Swal.fire({
+      title: "Delete Creator Channel?",
+      text: "WARNING: Are you sure you want to delete your creator channel? This will deactivate your creator status. Your personal account is preserved, but all your videos, tweets, and playlists will be permanently deleted.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--accent-cyan)",
+      cancelButtonColor: "var(--text-muted)",
+      confirmButtonText: "Yes, delete my channel!",
+      background: "var(--bg-secondary)",
+      color: "var(--text-main)",
+      customClass: {
+        popup: "glass-panel shadow-lg border-secondary"
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setDeleteLoading(true);
+        setDeleteError("");
+        try {
+          const response = await apiClient.delete("/users/delete-channel");
+          if (response.data?.success) {
+            updateUser(response.data.data); // Update global user state (hasChannel becomes false)
+            toast.success("Creator channel deactivated successfully");
+            navigate("/"); // Redirect to home
+          } else {
+            setDeleteError(response.data?.message || "Failed to delete channel.");
+            toast.error(response.data?.message || "Failed to delete channel.");
+          }
+        } catch (err) {
+          const errMsg = err.response?.data?.message || "Error deleting creator channel.";
+          setDeleteError(errMsg);
+          toast.error(errMsg);
+        } finally {
+          setDeleteLoading(false);
+        }
+      }
+    });
+  };
 
   const handleUpdateDetails = async (e) => {
     e.preventDefault();
@@ -204,6 +249,17 @@ const Settings = () => {
               <i className="bi bi-shield-lock fs-5"></i>
               <span>Security</span>
             </button>
+            {user.hasChannel && (
+              <button
+                onClick={() => setActiveSubTab("channel")}
+                className={`nav-link-custom border-0 text-start w-100 bg-transparent ${
+                  activeSubTab === "channel" ? "active" : ""
+                }`}
+              >
+                <i className="bi bi-play-btn fs-5"></i>
+                <span>Channel Controls</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -403,6 +459,44 @@ const Settings = () => {
                   {passwordLoading ? "Updating..." : "Change Password"}
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* CHANNEL CONTROLS TAB */}
+          {activeSubTab === "channel" && user.hasChannel && (
+            <div className="glass-panel p-4 border-danger">
+              <h5 className="fw-bold mb-3 text-danger">Channel Controls</h5>
+              <p className="text-muted small mb-4">
+                Deactivate your creator channel status on Vetwoplay. Your personal viewer account (login, preferences, history) will be completely preserved, but all your uploaded videos, tweets, and playlists will be permanently deleted from the database.
+              </p>
+
+              {deleteError && (
+                <div className="alert alert-glass border-danger text-danger mb-3 py-2 px-3 small">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="border border-danger border-opacity-25 rounded-3 p-4 bg-danger bg-opacity-10">
+                <h6 className="fw-bold text-danger mb-2">Danger Zone</h6>
+                <p className="text-muted small mb-3">
+                  Once you delete your creator channel, you cannot recover the uploaded videos, tweets, or subscriber relationships.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleDeleteChannel}
+                  disabled={deleteLoading}
+                  className="btn btn-danger rounded-pill px-4 py-2 fw-semibold"
+                >
+                  {deleteLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Creator Channel"
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>

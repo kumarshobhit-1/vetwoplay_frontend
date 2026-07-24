@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/client";
 import LoadingSpinner from "../components/LoadingSpinner";
 import VideoCard from "../components/VideoCard";
+import CreateChannelPrompt from "../components/CreateChannelPrompt";
 
 const Channel = () => {
   const { username } = useParams();
@@ -20,6 +21,7 @@ const Channel = () => {
   const [playlists, setPlaylists] = useState([]);
   const [tweets, setTweets] = useState([]);
   const [contentLoading, setContentLoading] = useState(false);
+  const [copiedTweetId, setCopiedTweetId] = useState(null);
 
   // Sub count & Sub button
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -36,8 +38,9 @@ const Channel = () => {
         setIsSubscribed(profile.isSubscribed);
         setSubscribersCount(profile.subscribersCount || 0);
         
-        // Fetch sub-items
-        fetchTabContent(activeTab, profile._id);
+        const defaultTab = profile.hasChannel ? "videos" : "playlists";
+        setActiveTab(defaultTab);
+        fetchTabContent(defaultTab, profile._id);
       } else {
         setError("Channel not found.");
       }
@@ -68,6 +71,21 @@ const Channel = () => {
         const response = await apiClient.get(`/tweet/getusertweet/${profileId}`);
         if (response.data?.success) {
           setTweets(response.data.data || []);
+        }
+      } else if (tab === "bookmarks") {
+        const response = await apiClient.get("/bookmarks/tweets");
+        if (response.data?.success) {
+          setTweets(response.data.data || []);
+        }
+      } else if (tab === "liked-videos") {
+        const response = await apiClient.get("/likes/likedvideos");
+        if (response.data?.success) {
+          setVideos(response.data.data || []);
+        }
+      } else if (tab === "watch-history") {
+        const response = await apiClient.get("/users/history");
+        if (response.data?.success) {
+          setVideos(response.data.data || []);
         }
       }
     } catch (err) {
@@ -137,6 +155,51 @@ const Channel = () => {
     }
   };
 
+  const handleBookmarkToggle = async (tweetId, idx) => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    const tweet = tweets[idx];
+    const previousStatus = tweet.isBookmarked;
+
+    const updatedTweets = [...tweets];
+    updatedTweets[idx] = {
+      ...tweet,
+      isBookmarked: !previousStatus
+    };
+    setTweets(updatedTweets);
+
+    try {
+      const response = await apiClient.post(`/bookmarks/toggle/${tweetId}`);
+      if (response.data?.success) {
+        if (activeTab === "bookmarks" && !response.data.data.bookmarked) {
+          setTweets((prev) => prev.filter((t) => t._id !== tweetId));
+        } else {
+          const syncedTweets = [...tweets];
+          syncedTweets[idx] = {
+            ...tweet,
+            isBookmarked: response.data.data.bookmarked
+          };
+          setTweets(syncedTweets);
+        }
+      }
+    } catch (err) {
+      console.error("Bookmark toggle fail:", err);
+      const revertedTweets = [...tweets];
+      revertedTweets[idx] = tweet;
+      setTweets(revertedTweets);
+    }
+  };
+
+  const handleCopyLink = (tweetId) => {
+    const url = `${window.location.origin}/tweets#tweet-${tweetId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedTweetId(tweetId);
+      setTimeout(() => setCopiedTweetId(null), 2000);
+    });
+  };
+
   if (loading) return <LoadingSpinner message="Visiting channel..." />;
 
   if (error || !channel) {
@@ -154,6 +217,8 @@ const Channel = () => {
     );
   }
 
+
+
   // Cover image style
   const coverStyle = {
     height: "240px",
@@ -163,90 +228,144 @@ const Channel = () => {
     position: "relative",
   };
 
-  
+  const isOwnChannel = user && channel && user._id === channel._id;
 
   return (
-    <div className="container-fluid p-0 pb-4">
-      {/* Banner / Cover */}
-      <div style={coverStyle}>
+    <div className="container py-4">
+      {/* Banner / Cover Card */}
+      <div 
+        className="position-relative overflow-hidden shadow-lg border border-secondary mb-4" 
+        style={{ 
+          height: "220px", 
+          borderRadius: "20px",
+          background: channel.coverImage
+            ? `url(${channel.coverImage}) center/cover no-repeat`
+            : "linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan-dark) 100%)",
+        }}
+      >
         <div className="position-absolute bottom-0 start-0 w-100 h-50" style={{ background: "linear-gradient(0deg, rgba(10,9,14,0.9), transparent)" }}></div>
       </div>
 
-      {/* Profile Info Container */}
-      <div className="container px-4" style={{ position: "relative", zIndex: 10 }}>
-        <div className="d-flex flex-wrap align-items-end justify-content-between gap-3 text-start">
+      {/* Profile Info Container Card */}
+      <div className="glass-panel border-secondary p-4 mb-4 shadow" style={{ borderRadius: "20px", marginTop: "-40px", position: "relative", zIndex: 10 }}>
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-4 text-start">
           <div className="d-flex flex-wrap gap-4 align-items-center">
             {/* Avatar */}
-            <img
-              src={channel.avatar}
-              alt={channel.username}
-              className="rounded-circle border border-4 shadow"
-              style={{ 
-                width: "130px", 
-                height: "130px", 
-                objectFit: "cover", 
-                backgroundColor: "var(--bg-primary)",
-                borderColor: "var(--bg-primary)",
-                marginTop: "-65px",
-                position: "relative",
-                zIndex: 12
-              }}
-            />
+            <div className="position-relative" style={{ marginTop: "-60px" }}>
+              <img
+                src={channel.avatar}
+                alt={channel.username}
+                className="rounded-circle border border-4 shadow-lg"
+                style={{ 
+                  width: "120px", 
+                  height: "120px", 
+                  objectFit: "cover", 
+                  backgroundColor: "var(--bg-primary)",
+                  borderColor: "var(--bg-secondary)",
+                }}
+              />
+            </div>
 
             {/* Title / Description */}
-            <div className="pt-3">
-              <h2 className="fw-bold mb-1">{channel.fullName}</h2>
+            <div>
+              <h2 className="fw-extrabold text-main mb-1 d-flex align-items-center gap-2">
+                {channel.fullName}
+                {!channel.hasChannel && <span className="badge bg-secondary small" style={{ fontSize: "0.65rem", padding: "4px 8px" }}>Viewer</span>}
+              </h2>
               <p className="text-muted fw-semibold mb-2">@{channel.username}</p>
               
               <div className="d-flex align-items-center gap-3 text-muted small">
-                <span>{subscribersCount} subscribers</span>
-                <span>•</span>
-                <span>{channel.channelsSubscribedToCount || 0} subscribed</span>
+                {channel.hasChannel && (
+                  <>
+                    <span><i className="bi bi-people me-1"></i>{subscribersCount} subscribers</span>
+                    <span>&bull;</span>
+                  </>
+                )}
+                <span><i className="bi bi-check2-circle me-1"></i>Subscribed to {channel.channelsSubscribedToCount || 0} channels</span>
               </div>
             </div>
           </div>
 
-          {/* Subscribe Button */}
-          {user?._id !== channel._id ? (
-            <button
-              onClick={handleSubscriptionToggle}
-              className={`btn px-4 py-2 rounded-pill fw-bold fs-6 shadow transition-all ${
-                isSubscribed
-                  ? "btn-glass border-secondary text-muted"
-                  : "btn-gradient text-white"
-              }`}
-            >
-              {isSubscribed ? "Subscribed" : "Subscribe"}
-            </button>
-          ) : (
-            <Link to="/dashboard" className="btn btn-glass border-secondary text-muted rounded-pill px-4 py-2 fw-semibold">
-              <i className="bi bi-gear-fill me-2"></i> Creator Studio
-            </Link>
-          )}
+          {/* Subscribe/Creator Button */}
+          <div>
+            {user?._id !== channel._id ? (
+              channel.hasChannel && (
+                <button
+                  onClick={handleSubscriptionToggle}
+                  className={`btn px-4 py-2 rounded-pill fw-bold fs-6 shadow transition-all ${
+                    isSubscribed
+                      ? "btn-glass border-secondary text-muted"
+                      : "btn-gradient text-white"
+                  }`}
+                >
+                  {isSubscribed ? "Subscribed" : "Subscribe"}
+                </button>
+              )
+            ) : (
+              channel.hasChannel ? (
+                <Link to="/dashboard" className="btn btn-glass border-secondary text-muted rounded-pill px-4 py-2 fw-semibold shadow-sm">
+                  <i className="bi bi-gear-fill me-2 text-pink"></i> Creator Studio
+                </Link>
+              ) : (
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="btn btn-gradient text-white rounded-pill px-4 py-2 fw-semibold shadow"
+                >
+                  <i className="bi bi-plus-circle me-2"></i> Create Channel
+                </button>
+              )
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="container mt-5 px-4">
-        <div className="d-flex border-bottom border-secondary mb-4">
-          <div
-            className={`tab-custom ${activeTab === "videos" ? "active" : ""}`}
-            onClick={() => setActiveTab("videos")}
-          >
-            <i className="bi bi-play-btn me-2"></i> Videos
-          </div>
+      <div className="mt-5">
+        <div className="d-flex border-bottom border-secondary mb-4 overflow-x-auto pb-2" style={{ gap: "10px" }}>
+          {channel.hasChannel && (
+            <div
+              className={`tab-custom ${activeTab === "videos" ? "active" : ""}`}
+              onClick={() => setActiveTab("videos")}
+            >
+              <i className="bi bi-play-btn me-2"></i> Videos
+            </div>
+          )}
           <div
             className={`tab-custom ${activeTab === "playlists" ? "active" : ""}`}
             onClick={() => setActiveTab("playlists")}
           >
             <i className="bi bi-collection-play me-2"></i> Playlists
           </div>
-          <div
-            className={`tab-custom ${activeTab === "tweets" ? "active" : ""}`}
-            onClick={() => setActiveTab("tweets")}
-          >
-            <i className="bi bi-chat-left-text me-2"></i> Tweets
-          </div>
+          {(channel.hasChannel || isOwnChannel) && (
+            <div
+              className={`tab-custom ${activeTab === "tweets" ? "active" : ""}`}
+              onClick={() => setActiveTab("tweets")}
+            >
+              <i className="bi bi-chat-left-text me-2"></i> Tweets
+            </div>
+          )}
+          {isOwnChannel && (
+            <>
+              <div
+                className={`tab-custom ${activeTab === "liked-videos" ? "active" : ""}`}
+                onClick={() => setActiveTab("liked-videos")}
+              >
+                <i className="bi bi-heart me-2"></i> Liked Videos
+              </div>
+              <div
+                className={`tab-custom ${activeTab === "bookmarks" ? "active" : ""}`}
+                onClick={() => setActiveTab("bookmarks")}
+              >
+                <i className="bi bi-bookmark me-2"></i> Saved Tweets
+              </div>
+              <div
+                className={`tab-custom ${activeTab === "watch-history" ? "active" : ""}`}
+                onClick={() => setActiveTab("watch-history")}
+              >
+                <i className="bi bi-clock-history me-2"></i> Watch History
+              </div>
+            </>
+          )}
         </div>
 
         {/* Tab content panel */}
@@ -283,7 +402,7 @@ const Channel = () => {
                 <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
                   {playlists.map((pl) => (
                     <div className="col" key={pl._id}>
-                      <Link to="/playlists" className="text-decoration-none">
+                      <Link to={`/playlists?id=${pl._id}`} className="text-decoration-none">
                         <div className="glass-panel glass-panel-hover p-3 text-start h-100 d-flex flex-column">
                           <div className="hover-zoom-img mb-3 rounded overflow-hidden" style={{ aspectRatio: "16/9", backgroundColor: "var(--bg-tertiary)" }}>
                             {pl.coverThumbnail ? (
@@ -309,64 +428,153 @@ const Channel = () => {
               )
             )}
 
-            {/* Tweets Tab */}
-            {activeTab === "tweets" && (
+            {/* Tweets & Bookmarks Tab */}
+            {(activeTab === "tweets" || activeTab === "bookmarks") && (
               tweets.length === 0 ? (
                 <div className="glass-panel border-secondary p-5 text-muted text-center">
                   <i className="bi bi-chat-quote fs-1 mb-2 d-block text-secondary"></i>
-                  <span className="small">This user hasn't posted any tweets yet.</span>
+                  <span className="small">
+                    {activeTab === "bookmarks" 
+                      ? "You haven't bookmarked any tweets yet." 
+                      : "This user hasn't posted any tweets yet."}
+                  </span>
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-3 mx-auto" style={{ maxWidth: "650px" }}>
-                  {tweets.map((tweet, idx) => (
-                    <div key={tweet._id} className="glass-panel border-secondary p-4 text-start">
-                      <div className="d-flex align-items-center justify-content-between mb-2">
-                        <div className="d-flex align-items-center gap-2">
-                          <img
-                            src={channel.avatar}
-                            alt="Avatar"
-                            className="rounded-circle border"
-                            style={{ width: "36px", height: "36px", objectFit: "cover" }}
-                          />
-                          <div>
-                            <span className="text-main fw-bold d-block" style={{ fontSize: "0.95rem" }}>
-                              {channel.fullName}
-                            </span>
-                            <span className="small text-muted">@{channel.username}</span>
+                  {tweets.map((tweet, idx) => {
+                    const isOwnTweet = user && tweet.owner && user._id === tweet.owner._id;
+                    return (
+                      <div key={tweet._id} className="glass-panel border-secondary p-4 text-start">
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                          <div className="d-flex align-items-center gap-2">
+                            <img
+                              src={tweet.owner?.avatar || channel.avatar}
+                              alt="Avatar"
+                              className="rounded-circle border"
+                              style={{ width: "36px", height: "36px", objectFit: "cover" }}
+                            />
+                            <div>
+                              <span className="text-main fw-bold d-block" style={{ fontSize: "0.95rem" }}>
+                                {tweet.owner?.fullName || channel.fullName}
+                              </span>
+                              <span className="small text-muted">@{tweet.owner?.username || channel.username}</span>
+                            </div>
                           </div>
+                          <span className="small text-muted" style={{ fontSize: "0.75rem" }}>
+                            {new Date(tweet.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
-                        <span className="small text-muted" style={{ fontSize: "0.75rem" }}>
-                          {new Date(tweet.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
 
-                      <p className="text-main mb-3" style={{ fontSize: "1.05rem", whiteSpace: "pre-line", wordBreak: "break-word" }}>
-                        {tweet.content}
-                      </p>
+                        <p className="text-main mb-3" style={{ fontSize: "1.05rem", whiteSpace: "pre-line", wordBreak: "break-word" }}>
+                          {tweet.content}
+                        </p>
 
-                      {/* Tweet Image if present */}
-                      {tweet.image && (
-                        <div className="mb-3 rounded border border-secondary overflow-hidden bg-dark bg-opacity-25" style={{ maxWidth: "100%", maxHeight: "350px" }}>
-                          <img 
-                            src={tweet.image} 
-                            alt="Tweet Media" 
-                            className="img-fluid w-100" 
-                            style={{ maxHeight: "350px", objectFit: "contain" }} 
-                          />
+                        {/* Tweet Image if present */}
+                        {tweet.image && (
+                          <div 
+                            className="mb-3 rounded border border-secondary overflow-hidden bg-dark bg-opacity-25 shadow-sm d-inline-block" 
+                            style={{ maxWidth: "100%" }}
+                          >
+                            <img 
+                              src={tweet.image} 
+                              alt="Tweet Media" 
+                              style={{ 
+                                display: "block",
+                                maxWidth: "100%", 
+                                maxHeight: "420px", 
+                                objectFit: "contain" 
+                              }} 
+                            />
+                          </div>
+                        )}
+
+                        <div className="d-flex pt-2 border-top border-secondary align-items-center justify-content-between text-muted">
+                          {/* Likes Action */}
+                          <button
+                            onClick={() => handleTweetLikeToggle(tweet._id, idx)}
+                            className={`btn btn-link p-0 border-0 text-decoration-none d-flex align-items-center gap-2 ${
+                              tweet.isLiked ? "text-danger" : "text-muted"
+                            }`}
+                          >
+                            <i className={`bi ${tweet.isLiked ? "bi-heart-fill text-danger" : "bi-heart"}`}></i>
+                            <span className="small fw-semibold">{tweet.likesCount || 0}</span>
+                          </button>
+
+                          {/* Bookmark Action */}
+                          {!isOwnTweet ? (
+                            <button
+                              onClick={() => handleBookmarkToggle(tweet._id, idx)}
+                              className={`btn btn-link p-0 border-0 text-decoration-none d-flex align-items-center transition-all ${
+                                tweet.isBookmarked ? "text-warning" : "text-muted"
+                              }`}
+                              title={tweet.isBookmarked ? "Bookmarked" : "Bookmark"}
+                            >
+                              <i className={`bi fs-5 ${tweet.isBookmarked ? "bi-bookmark-fill" : "bi-bookmark"}`}></i>
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-link p-0 border-0 text-muted-custom opacity-50 text-decoration-none d-flex align-items-center cursor-not-allowed"
+                              disabled
+                              style={{ cursor: "not-allowed" }}
+                              title="You cannot save your own tweet"
+                            >
+                              <i className="bi bi-bookmark fs-5"></i>
+                            </button>
+                          )}
+
+                          {/* Copy Link / Share Action */}
+                          <button
+                            onClick={() => handleCopyLink(tweet._id)}
+                            className="btn btn-link p-0 border-0 text-muted text-decoration-none d-flex align-items-center gap-1 transition-all"
+                            title="Copy Link to Post"
+                          >
+                            {copiedTweetId === tweet._id ? (
+                              <>
+                                <i className="bi bi-check2 text-success fs-5"></i>
+                                <span className="small text-success fw-bold" style={{ fontSize: "0.75rem" }}>Copied!</span>
+                              </>
+                            ) : (
+                              <i className="bi bi-share fs-5"></i>
+                            )}
+                          </button>
                         </div>
-                      )}
-
-                      <div className="d-flex pt-2 border-top border-secondary">
-                        <button
-                          onClick={() => handleTweetLikeToggle(tweet._id, idx)}
-                          className={`btn btn-link p-0 border-0 text-decoration-none d-flex align-items-center gap-2 ${
-                            tweet.isLiked ? "text-danger" : "text-muted"
-                          }`}
-                        >
-                          <i className={`bi ${tweet.isLiked ? "bi-heart-fill text-danger" : "bi-heart"}`}></i>
-                          <span className="small fw-semibold">{tweet.likesCount || 0}</span>
-                        </button>
                       </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {/* Liked Videos Tab */}
+            {activeTab === "liked-videos" && (
+              videos.length === 0 ? (
+                <div className="glass-panel border-secondary p-5 text-muted text-center">
+                  <i className="bi bi-heartbreak fs-1 mb-2 d-block text-secondary"></i>
+                  <p className="mb-0">You haven't liked any videos yet.</p>
+                </div>
+              ) : (
+                <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                  {videos.map((vid) => (
+                    <div className="col" key={vid._id}>
+                      <VideoCard video={{ ...vid, owner: vid.ownerDetails || vid.owner }} />
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {/* Watch History Tab */}
+            {activeTab === "watch-history" && (
+              videos.length === 0 ? (
+                <div className="glass-panel border-secondary p-5 text-muted text-center">
+                  <i className="bi bi-clock-history fs-1 mb-2 d-block text-secondary"></i>
+                  <p className="mb-0">Your watch history is empty.</p>
+                </div>
+              ) : (
+                <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                  {videos.map((vid) => (
+                    <div className="col" key={vid._id}>
+                      <VideoCard video={vid} />
                     </div>
                   ))}
                 </div>

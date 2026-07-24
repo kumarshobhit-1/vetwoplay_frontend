@@ -74,27 +74,31 @@ const Sidebar = ({ collapsed, toggleSidebar }) => {
               <span className="sidebar-text">Watch History</span>
             </NavLink>
 
-            <div className="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2" style={{ fontSize: "0.75rem", letterSpacing: "1px" }}>
-              Creator Space
-            </div>
+            {user.hasChannel && (
+              <>
+                <div className="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2" style={{ fontSize: "0.75rem", letterSpacing: "1px" }}>
+                  Creator Space
+                </div>
 
-            <NavLink
-              to="/dashboard"
-              className={({ isActive }) => `nav-link-custom ${isActive ? "active" : ""}`}
-              title="Creator Dashboard"
-            >
-              <i className="bi bi-speedometer2 fs-5"></i>
-              <span className="sidebar-text">Creator Dashboard</span>
-            </NavLink>
+                <NavLink
+                  to="/dashboard"
+                  className={({ isActive }) => `nav-link-custom ${isActive ? "active" : ""}`}
+                  title="Creator Dashboard"
+                >
+                  <i className="bi bi-speedometer2 fs-5"></i>
+                  <span className="sidebar-text">Creator Dashboard</span>
+                </NavLink>
 
-            <NavLink
-              to="/upload"
-              className={({ isActive }) => `nav-link-custom ${isActive ? "active" : ""}`}
-              title="Upload Video"
-            >
-              <i className="bi bi-cloud-arrow-up fs-5"></i>
-              <span className="sidebar-text">Upload Video</span>
-            </NavLink>
+                <NavLink
+                  to="/upload"
+                  className={({ isActive }) => `nav-link-custom ${isActive ? "active" : ""}`}
+                  title="Upload Video"
+                >
+                  <i className="bi bi-cloud-arrow-up fs-5"></i>
+                  <span className="sidebar-text">Upload Video</span>
+                </NavLink>
+              </>
+            )}
           </>
         )}
 

@@ -37,8 +37,10 @@ const Home = () => {
 
       if (searchQuery) {
         params.query = searchQuery;
-      } else if (categoryQuery !== "All") {
-        params.query = categoryQuery;
+      }
+
+      if (categoryQuery !== "All") {
+        params.category = categoryQuery;
       }
 
       const response = await apiClient.get("/videos/allvideos", { params });

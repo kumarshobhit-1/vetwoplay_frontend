@@ -2,10 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import apiClient from "../api/client";
+import toast from "react-hot-toast";
+import Swal from "sweetalert2";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const Playlists = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -22,6 +24,12 @@ const Playlists = () => {
   // Selected Playlist details
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [selectedPlaylistLoading, setSelectedPlaylistLoading] = useState(false);
+
+  // Add Video selector modal state
+  const [showAddVideoModal, setShowAddVideoModal] = useState(false);
+  const [searchVideoQuery, setSearchVideoQuery] = useState("");
+  const [searchVideoResults, setSearchVideoResults] = useState([]);
+  const [searchVideoLoading, setSearchVideoLoading] = useState(false);
 
   const fetchPlaylists = async () => {
     if (!user) return;
@@ -42,12 +50,13 @@ const Playlists = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate("/login");
       return;
     }
     fetchPlaylists();
-  }, [user]);
+  }, [user, authLoading]);
 
   // Handle auto-selection when navigating from autocomplete search selection
   useEffect(() => {
@@ -62,7 +71,7 @@ const Playlists = () => {
 
   const handleCreatePlaylistSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !description.trim()) return;
+    if (!name.trim()) return;
 
     setCreateLoading(true);
     try {
@@ -74,31 +83,48 @@ const Playlists = () => {
         setName("");
         setDescription("");
         setShowCreateModal(false);
+        toast.success("Playlist created successfully");
         // Reload playlists
         fetchPlaylists();
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Error creating playlist");
+      toast.error(err.response?.data?.message || "Error creating playlist");
     } finally {
       setCreateLoading(false);
     }
   };
 
-  const handleDeletePlaylist = async (playlistId, e) => {
+  const handleDeletePlaylist = (playlistId, e) => {
     e.stopPropagation(); // Avoid triggering details modal
-    if (!window.confirm("Are you sure you want to delete this playlist?")) return;
-
-    try {
-      const response = await apiClient.delete(`/playlists/removeplaylist/${playlistId}`);
-      if (response.data?.success) {
-        setPlaylists((prev) => prev.filter((p) => p._id !== playlistId));
-        if (selectedPlaylist?._id === playlistId) {
-          setSelectedPlaylist(null);
+    Swal.fire({
+      title: "Delete Playlist?",
+      text: "Are you sure you want to permanently delete this playlist?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--accent-cyan)",
+      cancelButtonColor: "var(--text-muted)",
+      confirmButtonText: "Yes, delete it!",
+      background: "var(--bg-secondary)",
+      color: "var(--text-main)",
+      customClass: {
+        popup: "glass-panel shadow-lg border-secondary"
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const response = await apiClient.delete(`/playlists/removeplaylist/${playlistId}`);
+          if (response.data?.success) {
+            setPlaylists((prev) => prev.filter((p) => p._id !== playlistId));
+            if (selectedPlaylist?._id === playlistId) {
+              setSelectedPlaylist(null);
+            }
+            toast.success("Playlist deleted successfully");
+          }
+        } catch (err) {
+          toast.error(err.response?.data?.message || "Error deleting playlist");
         }
       }
-    } catch (err) {
-      alert(err.response?.data?.message || "Error deleting playlist");
-    }
+    });
   };
 
   const handlePlaylistSelect = async (playlistId) => {
@@ -109,29 +135,116 @@ const Playlists = () => {
         setSelectedPlaylist(response.data.data);
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Error fetching playlist details");
+      toast.error(err.response?.data?.message || "Error fetching playlist details");
     } finally {
       setSelectedPlaylistLoading(false);
     }
   };
 
-  const handleRemoveVideoFromPlaylist = async (videoId) => {
+  const handleRemoveVideoFromPlaylist = (videoId) => {
     if (!selectedPlaylist) return;
-    if (!window.confirm("Remove this video from the playlist?")) return;
+    Swal.fire({
+      title: "Remove Video?",
+      text: "Are you sure you want to remove this video from the playlist?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--accent-cyan)",
+      cancelButtonColor: "var(--text-muted)",
+      confirmButtonText: "Yes, remove it!",
+      background: "var(--bg-secondary)",
+      color: "var(--text-main)",
+      customClass: {
+        popup: "glass-panel shadow-lg border-secondary"
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const response = await apiClient.delete(
+            `/playlists/${selectedPlaylist._id}/removevideo/${videoId}`
+          );
+          if (response.data?.success) {
+            setSelectedPlaylist(response.data.data);
+            toast.success("Video removed from playlist");
+            // Refresh full playlist list to update cover thumbnails and counts
+            fetchPlaylists();
+          }
+        } catch (err) {
+          toast.error(err.response?.data?.message || "Error removing video from playlist");
+        }
+      }
+    });
+  };
 
+  const handleSharePlaylist = () => {
+    if (!selectedPlaylist) return;
+    const url = `${window.location.origin}/playlists?id=${selectedPlaylist._id}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Playlist link copied to clipboard!");
+  };
+
+  const fetchVideosForModal = async (searchVal) => {
+    setSearchVideoLoading(true);
     try {
-      const response = await apiClient.delete(
-        `/playlists/${selectedPlaylist._id}/removevideo/${videoId}`
+      const response = await apiClient.get("/videos/allvideos", {
+        params: {
+          page: 1,
+          limit: 10,
+          query: searchVal,
+          sortBy: "createdAt",
+          sortType: "desc"
+        }
+      });
+      if (response.data?.success) {
+        setSearchVideoResults(response.data.data.videos || []);
+      }
+    } catch (err) {
+      console.error("Error searching videos:", err);
+    } finally {
+      setSearchVideoLoading(false);
+    }
+  };
+
+  const handleOpenAddVideoModal = () => {
+    setShowAddVideoModal(true);
+    setSearchVideoQuery("");
+    fetchVideosForModal("");
+  };
+
+  const handleAddVideoToPlaylist = async (videoId) => {
+    if (!selectedPlaylist) return;
+    try {
+      const response = await apiClient.patch(
+        `/playlists/${selectedPlaylist._id}/addvideo/${videoId}`
       );
       if (response.data?.success) {
         setSelectedPlaylist(response.data.data);
-        // Refresh full playlist list to update cover thumbnails and counts
+        toast.success("Video added to playlist");
+        // Refresh index
         fetchPlaylists();
+        setShowAddVideoModal(false);
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Error removing video from playlist");
+      toast.error(err.response?.data?.message || "Error adding video to playlist");
     }
   };
+
+  // Debounce video search inside the modal
+  useEffect(() => {
+    if (!showAddVideoModal) return;
+    const timer = setTimeout(() => {
+      fetchVideosForModal(searchVideoQuery);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [searchVideoQuery, showAddVideoModal]);
+
+  const isPlaylistOwner = selectedPlaylist && user && (
+    selectedPlaylist.owner === user._id || 
+    selectedPlaylist.owner?._id === user._id
+  );
+
+  if (authLoading) {
+    return <LoadingSpinner message="Checking authentication..." />;
+  }
 
   if (!user) return null;
 
@@ -206,18 +319,30 @@ const Playlists = () => {
               <h3 className="text-main fw-bold mb-2">{selectedPlaylist.name}</h3>
               
               {/* Creator details */}
-              <Link
-                to={`/c/${selectedPlaylist.owner?.username}`}
-                className="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none hover-opacity"
-              >
-                <img
-                  src={selectedPlaylist.owner?.avatar}
-                  alt={selectedPlaylist.owner?.username}
-                  className="rounded-circle border border-secondary"
-                  style={{ width: "24px", height: "24px", objectFit: "cover" }}
-                />
-                <span className="small text-main fw-semibold">@{selectedPlaylist.owner?.username}</span>
-              </Link>
+              {selectedPlaylist.owner?.hasChannel ? (
+                <Link
+                  to={`/c/${selectedPlaylist.owner?.username}`}
+                  className="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none hover-opacity"
+                >
+                  <img
+                    src={selectedPlaylist.owner?.avatar}
+                    alt={selectedPlaylist.owner?.username}
+                    className="rounded-circle border border-secondary"
+                    style={{ width: "24px", height: "24px", objectFit: "cover" }}
+                  />
+                  <span className="small text-main fw-semibold">@{selectedPlaylist.owner?.username}</span>
+                </Link>
+              ) : (
+                <div className="d-inline-flex align-items-center gap-2 mb-3 text-muted">
+                  <img
+                    src={selectedPlaylist.owner?.avatar}
+                    alt={selectedPlaylist.owner?.username}
+                    className="rounded-circle border border-secondary"
+                    style={{ width: "24px", height: "24px", objectFit: "cover", filter: "grayscale(100%)" }}
+                  />
+                  <span className="small fw-semibold">@{selectedPlaylist.owner?.username}</span>
+                </div>
+              )}
 
               {/* Playlist Stats */}
               <div className="d-flex gap-3 text-muted small mb-3">
@@ -247,6 +372,24 @@ const Playlists = () => {
                   No Videos
                 </button>
               )}
+
+              <button
+                onClick={handleSharePlaylist}
+                className="btn btn-glass w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2 mt-2 shadow-sm"
+                style={{ borderRadius: "10px" }}
+              >
+                <i className="bi bi-share fs-6"></i> Share Playlist
+              </button>
+
+              {isPlaylistOwner && (
+                <button
+                  onClick={handleOpenAddVideoModal}
+                  className="btn btn-gradient w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2 mt-2 shadow"
+                  style={{ borderRadius: "10px" }}
+                >
+                  <i className="bi bi-plus-circle fs-5"></i> Add Videos
+                </button>
+              )}
             </div>
           </div>
 
@@ -262,7 +405,15 @@ const Playlists = () => {
               ) : !selectedPlaylist.videos || selectedPlaylist.videos.length === 0 ? (
                 <div className="text-center py-5 text-muted">
                   <i className="bi bi-file-earmark-music fs-1 d-block mb-2 text-secondary"></i>
-                  <p className="small mb-0">No videos in this playlist yet.</p>
+                  <p className="small mb-3">No videos in this playlist yet.</p>
+                  {isPlaylistOwner && (
+                    <button
+                      onClick={handleOpenAddVideoModal}
+                      className="btn btn-glass border-secondary text-main rounded-pill px-4 py-2 shadow-sm"
+                    >
+                      <i className="bi bi-plus-circle me-2 text-pink"></i> Add Videos
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-3">
@@ -305,13 +456,15 @@ const Playlists = () => {
                       </div>
 
                       {/* Remove Button */}
-                      <button
-                        onClick={() => handleRemoveVideoFromPlaylist(vid._id)}
-                        className="btn btn-link text-danger border-0 p-1 p-md-2 shadow-none"
-                        title="Remove from playlist"
-                      >
-                        <i className="bi bi-trash fs-5"></i>
-                      </button>
+                      {isPlaylistOwner && (
+                        <button
+                          onClick={() => handleRemoveVideoFromPlaylist(vid._id)}
+                          className="btn btn-link text-danger border-0 p-1 p-md-2 shadow-none"
+                          title="Remove from playlist"
+                        >
+                          <i className="bi bi-trash fs-5"></i>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -371,12 +524,26 @@ const Playlists = () => {
 
                       <div className="d-flex align-items-center justify-content-between mt-auto pt-2 border-top border-secondary">
                         <span className="small text-muted">{pl.totalViews || 0} views</span>
-                        <button
-                          onClick={(e) => handleDeletePlaylist(pl._id, e)}
-                          className="btn btn-link p-0 text-danger border-0 text-decoration-none small"
-                        >
-                          <i className="bi bi-trash"></i> Delete
-                        </button>
+                        <div className="d-flex gap-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const url = `${window.location.origin}/playlists?id=${pl._id}`;
+                              navigator.clipboard.writeText(url);
+                              toast.success("Playlist link copied to clipboard!");
+                            }}
+                            className="btn btn-link p-0 text-gradient border-0 text-decoration-none small"
+                            title="Share playlist"
+                          >
+                            <i className="bi bi-share"></i> Share
+                          </button>
+                          <button
+                            onClick={(e) => handleDeletePlaylist(pl._id, e)}
+                            className="btn btn-link p-0 text-danger border-0 text-decoration-none small"
+                          >
+                            <i className="bi bi-trash"></i> Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -415,14 +582,13 @@ const Playlists = () => {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small text-muted fw-semibold">Description</label>
+                    <label className="form-label small text-muted fw-semibold">Description (optional)</label>
                     <textarea
                       className="form-control form-control-glass"
                       rows="3"
                       placeholder="Give it a brief description..."
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      required
                     />
                   </div>
                 </div>
@@ -444,6 +610,121 @@ const Playlists = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Video to Playlist Modal */}
+      {showAddVideoModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.8)", zIndex: 1100 }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content glass-panel border-secondary p-4 text-start" style={{ background: "var(--bg-secondary)", maxHeight: "90vh" }}>
+              <div className="modal-header border-0 p-0 mb-3 d-flex align-items-center justify-content-between">
+                <h5 className="modal-title fw-bold text-gradient d-flex align-items-center gap-2">
+                  <i className="bi bi-plus-circle-fill text-pink"></i> Add Video to Playlist
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowAddVideoModal(false)}
+                ></button>
+              </div>
+
+              {/* Search bar inside modal */}
+              <div className="mb-3 position-relative">
+                <div className="input-group">
+                  <span className="input-group-text bg-dark bg-opacity-25 border-secondary text-muted">
+                    {searchVideoLoading ? (
+                      <span className="spinner-border spinner-border-sm text-pink" role="status" aria-hidden="true"></span>
+                    ) : (
+                      <i className="bi bi-search"></i>
+                    )}
+                  </span>
+                  <input
+                    type="text"
+                    className="form-control form-control-glass border-start-0"
+                    placeholder="Search videos by title..."
+                    value={searchVideoQuery}
+                    onChange={(e) => setSearchVideoQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Videos list */}
+              <div className="modal-body p-0 overflow-y-auto" style={{ maxHeight: "400px" }}>
+                {searchVideoLoading && searchVideoResults.length === 0 ? (
+                  <div className="text-center py-5 text-muted">
+                    <div className="spinner-border text-pink mb-2" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="small mb-0">Searching platform videos...</p>
+                  </div>
+                ) : searchVideoResults.length === 0 ? (
+                  <div className="text-center py-5 text-muted">
+                    <i className="bi bi-info-circle fs-2 d-block mb-2 text-secondary"></i>
+                    <p className="small mb-0">No matching public videos found.</p>
+                  </div>
+                ) : (
+                  <div className="d-flex flex-column gap-2">
+                    {searchVideoResults.map((vid) => {
+                      const isAlreadyAdded = selectedPlaylist.videos?.some(v => v._id === vid._id);
+                      return (
+                        <div
+                          key={vid._id}
+                          className="d-flex align-items-center gap-3 p-2 border border-secondary rounded bg-dark bg-opacity-10"
+                        >
+                          {/* Thumbnail */}
+                          <div className="flex-shrink-0" style={{ width: "90px", aspectRatio: "16/9" }}>
+                            <img
+                              src={vid.thumbnail}
+                              alt={vid.title}
+                              className="w-100 h-100 rounded"
+                              style={{ objectFit: "cover" }}
+                            />
+                          </div>
+
+                          {/* Details */}
+                          <div className="flex-grow-1 overflow-hidden">
+                            <h6 className="text-main fw-semibold text-truncate mb-0" style={{ fontSize: "0.9rem" }} title={vid.title}>
+                              {vid.title}
+                            </h6>
+                            <span className="text-muted small" style={{ fontSize: "0.75rem" }}>
+                              by @{vid.owner?.username || "creator"} &bull; {vid.views || 0} views
+                            </span>
+                          </div>
+
+                          {/* Action Button */}
+                          <div className="flex-shrink-0">
+                            {isAlreadyAdded ? (
+                              <button className="btn btn-sm btn-glass text-muted border-secondary py-1.5 px-3 rounded-pill" disabled>
+                                <i className="bi bi-check-circle-fill text-success me-1"></i> Added
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleAddVideoToPlaylist(vid._id)}
+                                className="btn btn-sm btn-gradient text-white py-1.5 px-3 rounded-pill"
+                              >
+                                <i className="bi bi-plus-lg me-1"></i> Add
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer border-0 p-0 mt-3 d-flex justify-content-end">
+                <button
+                  type="button"
+                  className="btn btn-glass px-4"
+                  onClick={() => setShowAddVideoModal(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

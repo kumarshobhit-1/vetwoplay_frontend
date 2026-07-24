@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import apiClient from "../api/client";
+import CreateChannelPrompt from "../components/CreateChannelPrompt";
 
 const UploadVideo = () => {
   const { user } = useAuth();
@@ -9,21 +10,40 @@ const UploadVideo = () => {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("All");
   const [videoFile, setVideoFile] = useState(null);
 
   const [uploading, setUploading] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState("upload"); // "upload" | "processing"
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  const processingIntervalRef = useRef(null);
 
   const handleVideoFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       setVideoFile(e.target.files[0]);
-      // Pre-fill title from filename without extension
       const fileName = e.target.files[0].name;
       const baseName = fileName.substring(0, fileName.lastIndexOf(".")) || fileName;
       setTitle(baseName);
     }
+  };
+
+  // Phase 2: slowly tick progress from 80 → 98 while server processes on Cloudinary
+  const startProcessingTick = () => {
+    setUploadPhase("processing");
+    processingIntervalRef.current = setInterval(() => {
+      setUploadPercent((prev) => {
+        if (prev >= 98) {
+          clearInterval(processingIntervalRef.current);
+          return 98;
+        }
+        // Slows down as it approaches 98 for a natural feel
+        const step = prev < 90 ? 1 : 0.3;
+        return Math.min(parseFloat((prev + step).toFixed(1)), 98);
+      });
+    }, 600);
   };
 
   const handleUploadSubmit = async (e) => {
@@ -35,7 +55,6 @@ const UploadVideo = () => {
       setError("Please select a video file to upload.");
       return;
     }
-
     if (!title.trim()) {
       setError("Title is required.");
       return;
@@ -43,39 +62,54 @@ const UploadVideo = () => {
 
     setUploading(true);
     setUploadPercent(0);
+    setUploadPhase("upload");
 
     const formData = new FormData();
     formData.append("title", title.trim());
     formData.append("description", description.trim());
+    formData.append("category", category);
     formData.append("videoFile", videoFile);
 
     try {
       const response = await apiClient.post("/videos/upload-videos", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        // Track client upload progress
+        headers: { "Content-Type": "multipart/form-data" },
+        // Phase 1: real browser → server transfer, mapped to 0–80%
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
+          const realPercent = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
-          setUploadPercent(percentCompleted);
+          // Scale real 0–100% to displayed 0–80%
+          const displayPercent = Math.round(realPercent * 0.8);
+          setUploadPercent(displayPercent);
+
+          // Once browser finishes sending, kick off Phase 2 simulated tick
+          if (realPercent === 100 && !processingIntervalRef.current) {
+            startProcessingTick();
+          }
         },
       });
+
+      // Server responded — clear tick, jump to 100%
+      if (processingIntervalRef.current) {
+        clearInterval(processingIntervalRef.current);
+        processingIntervalRef.current = null;
+      }
+      setUploadPercent(100);
 
       if (response.data?.success) {
         setSuccess(true);
         setTitle("");
         setDescription("");
         setVideoFile(null);
-        // Automatically redirect to Creator Studio after short delay
-        setTimeout(() => {
-          navigate("/dashboard");
-        }, 1500);
+        setTimeout(() => navigate("/dashboard"), 1500);
       } else {
         setError(response.data?.message || "Upload failed.");
       }
     } catch (err) {
+      if (processingIntervalRef.current) {
+        clearInterval(processingIntervalRef.current);
+        processingIntervalRef.current = null;
+      }
       setError(
         err.response?.data?.message ||
           "An error occurred while uploading. Ensure it's under file size limitations."
@@ -86,6 +120,10 @@ const UploadVideo = () => {
   };
 
   if (!user) return null;
+
+  if (!user.hasChannel) {
+    return <CreateChannelPrompt onChannelCreated={() => window.location.reload()} />;
+  }
 
   return (
     <div className="container py-5 d-flex align-items-center justify-content-center">
@@ -139,7 +177,7 @@ const UploadVideo = () => {
           </div>
 
           {/* Description */}
-          <div className="mb-4 text-start">
+          <div className="mb-3 text-start">
             <label className="form-label small text-muted fw-semibold">Description</label>
             <textarea
               className="form-control form-control-glass"
@@ -151,20 +189,47 @@ const UploadVideo = () => {
             />
           </div>
 
-          {/* Upload Progress Bar */}
+          {/* Category */}
+          <div className="mb-4 text-start">
+            <label className="form-label small text-muted fw-semibold">Category</label>
+            <select
+              className="form-select form-control-glass border-secondary"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              disabled={uploading}
+            >
+              {["All", "Coding", "Gaming", "Music", "React", "Tech", "Vlogs"].map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat === "All" ? "General / Uncategorized" : cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Two-Phase Upload Progress Bar */}
           {uploading && (
             <div className="mb-4 text-start">
-              <div className="d-flex justify-content-between mb-1 small text-muted fw-bold">
-                <span>Uploading files...</span>
-                <span>{uploadPercent}%</span>
+              <div className="d-flex justify-content-between mb-1 small fw-bold">
+                <span className={uploadPhase === "processing" ? "text-warning" : "text-muted"}>
+                  {uploadPhase === "processing" ? (
+                    <><i className="bi bi-gear-fill me-1"></i>Processing on server...</>
+                  ) : (
+                    <><i className="bi bi-cloud-arrow-up me-1"></i>Uploading file...</>
+                  )}
+                </span>
+                <span className="text-muted">{Math.round(uploadPercent)}%</span>
               </div>
               <div className="progress" style={{ height: "8px", backgroundColor: "rgba(255,255,255,0.05)" }}>
                 <div
-                  className="progress-bar progress-bar-striped progress-bar-animated"
+                  className="progress-bar"
                   role="progressbar"
                   style={{
                     width: `${uploadPercent}%`,
-                    background: "linear-gradient(90deg, var(--accent-purple), var(--accent-cyan))",
+                    background:
+                      uploadPhase === "processing"
+                        ? "linear-gradient(90deg, var(--accent-purple), #f59e0b)"
+                        : "linear-gradient(90deg, var(--accent-purple), var(--accent-cyan))",
+                    transition: "width 0.5s ease",
                   }}
                   aria-valuenow={uploadPercent}
                   aria-valuemin="0"
@@ -172,7 +237,9 @@ const UploadVideo = () => {
                 ></div>
               </div>
               <div className="small text-muted mt-2 text-center">
-                This might take a moment. Please do not close the browser window.
+                {uploadPhase === "processing"
+                  ? "Video is being processed & uploaded to Cloudinary. This may take a moment..."
+                  : "Sending file to server. Please do not close the browser window."}
               </div>
             </div>
           )}
@@ -190,7 +257,7 @@ const UploadVideo = () => {
               {uploading ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                  Processing...
+                  {uploadPhase === "processing" ? "Processing..." : "Uploading..."}
                 </>
               ) : (
                 <>

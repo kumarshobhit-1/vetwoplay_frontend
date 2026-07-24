@@ -16,13 +16,16 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Avoid infinite loop if refresh token itself fails or if it's already retried
+    // Avoid infinite loop if refresh token itself fails or if it's a public/guest endpoint
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
       !originalRequest.url.includes("/users/refresh-token") &&
       !originalRequest.url.includes("/users/login") &&
-      !originalRequest.url.includes("/users/logout")
+      !originalRequest.url.includes("/users/logout") &&
+      !originalRequest.url.includes("/users/current-user") &&
+      !originalRequest.url.includes("/users/register") &&
+      !originalRequest.url.includes("/users/check-email")
     ) {
       originalRequest._retry = true;
       try {

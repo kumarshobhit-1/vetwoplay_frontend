@@ -59,7 +59,7 @@ const Login = () => {
             <input
               type="text"
               className="form-control form-control-glass"
-              placeholder="e.g. shobhit or user@example.com"
+              placeholder="username or user@example.com"
               value={identity}
               onChange={(e) => setIdentity(e.target.value)}
               required

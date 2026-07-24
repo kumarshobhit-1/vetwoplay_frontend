@@ -214,6 +214,19 @@ select option {
   opacity: 0.65;
 }
 
+/* Restore visible dropdown arrow on select elements */
+select.form-control-glass,
+select.form-control-glass.form-select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a78bfa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  background-size: 16px !important;
+  padding-right: 40px !important;
+  cursor: pointer;
+}
+
 /* Table styling for light & dark themes */
 .table {
   --bs-table-bg: transparent !important;
@@ -346,12 +359,14 @@ select option {
 .text-gradient {
   background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan-dark) 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .dark-theme .text-gradient {
   background: linear-gradient(135deg, #ffffff 30%, var(--accent-cyan) 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -456,4 +471,13 @@ select option {
     top: 100px;
     z-index: 5;
   }
+}
+
+.btn-dropdown-hover {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-dropdown-hover:hover {
+  background-color: rgba(123, 44, 191, 0.08) !important;
+  color: var(--text-main) !important;
 }
